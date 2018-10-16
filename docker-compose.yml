@@ -1,0 +1,64 @@
+version: '3'
+services:
+  nginx:
+    image: nginx:1.10.3
+    ports:
+      - '80:80'
+    volumes:
+      - ./config/nginx:/etc/nginx/conf.d:ro
+      - ./src:/var/www/html/ldshe:ro
+    depends_on:
+      - app
+  mysql:
+    image: mysql:5.7.18
+    volumes:
+      - ./config/mysql/my.cnf:/etc/alternatives/my.cnf:ro
+      - mysql-data:/var/lib/mysql
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: 1
+  redis:
+    image: redis:4.0.9
+    volumes:
+      - ./config/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - redis-data:/data
+    command: ['redis-server', '/usr/local/etc/redis/redis.conf']
+  echo:
+    image: node:8.11.1
+    volumes:
+      - ./src:/var/www/html/ldshe:ro
+    working_dir: /var/www/html/ldshe/echo
+    command: ['node', 'server']
+    depends_on:
+      - redis
+      - app
+  cron:
+    image: ldshe-cron:1.0
+    build:
+      context: ./cron
+    volumes:
+      - ./src:/var/www/html/ldshe:ro
+    depends_on:
+      - app
+  queue:
+    image: ldshe-app:1.0
+    volumes:
+      - ./src:/var/www/html/ldshe:rw
+    working_dir: /var/www/html/ldshe/api
+    command: ['php', 'artisan', 'queue:work']
+    depends_on:
+      - app
+  app:
+    image: ldshe-app:1.0
+    build:
+      context: ./app
+    volumes:
+      - ./config/php/php.ini:/usr/local/etc/php/php.ini:ro
+      - ./src:/var/www/html/ldshe:rw
+    working_dir: /var/www/html/ldshe
+    depends_on:
+      - mysql
+      - redis
+
+volumes:
+  mysql-data:
+  redis-data:
